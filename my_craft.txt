@@ -1,0 +1,1349 @@
+---------------------------------------------/design/my_craft.puml
+
+@startuml
+
+class Window
+{
+    - window: RenderWindow
+    - createShape(int size, ShapeType shapeType): CircleShape
+    - fillColor(CircleShape& shape, Color color): void
+
+    + isOpen(): bool
+    + close(): void
+    + display(): void
+    + clear(): void
+    + draw(int size, ShapeType shapeType, Color color, Vector2D coords): void
+    + checkForCloseCommand(): bool
+}
+
+
+class Resource
+{
+    # size: int
+    # color: Color
+    # shape: ShapeType
+    # coords: Vector2D
+
+    + getSize(): int
+    + getColor(): Color
+    + getShape(): ShapeType
+    + getCoords(): Vector2D
+}
+
+class Stone 
+class Wood 
+class Coal 
+class Iron 
+
+
+
+class World 
+{
+    - players: std::vector<std::shared_ptr<Player>>
+    - window: std::shared_ptr<Window>
+
+    + displayAllResources(std::vector<std::shared_ptr<Resource>>): void
+    + addPlayer(std::shared_ptr<Player>): void
+    + removePlayer(std::shared_ptr<Player>): void
+    + displayAllPlayers(): void
+}
+
+
+class Player
+{
+    - resources: std::vector<std::shared_ptr<Resource>>
+    - color: Color
+    - shape: ShapeType
+    - coords: Vector2D
+    - makeStep(Vector2D destination): void
+    
+    + getColor(): Color
+    + getShape(): ShapeType
+    + getCoords(): Vector2D
+    + gatherResources(int speed, ResourceMap& map, const std::shared_ptr<Strategy>& strategy): void
+}
+
+class ResourceMap
+{
+    - resources: std::vector<std::shared_ptr<Resource>>
+    + getResources(): std::vector<std::shared_ptr<Resource>>
+    + addResource(std::shared_ptr<Resource>): void
+    + removeResource(std::shared_ptr<Resource>): void
+}
+
+abstract class Strategy
+{
+    + collect(const std::vector<std::shared_ptr<Resource>>& resources, 
+        const Vector2D& coords): std::shared_ptr<Resource>
+}
+
+class ClosestPointStrategy
+class GreedyStrategy
+
+World *-up-> Window
+World o-down-> Player
+Coal -up-|> Resource
+Iron -up-|> Resource
+Stone -up-|> Resource
+Wood -up-|> Resource
+Player o-left-> Resource
+Player -down-> ResourceMap
+World --> Resource
+ResourceMap o-down-> Resource
+Player -right-> Strategy
+ClosestPointStrategy -down-|> Strategy
+GreedyStrategy -down-|> Strategy
+Strategy --> Resource
+
+@enduml
+
+
+---------------------------------------------implementation/elements/CMakeLists.txt
+
+add_library(elements STATIC)
+target_sources(elements PRIVATE 
+    src/coal.cpp
+    src/iron.cpp
+    src/player.cpp
+    src/resource.cpp
+    src/stone.cpp
+    src/wood.cpp
+)
+target_include_directories(elements PUBLIC include)
+target_link_libraries(elements PUBLIC utils environment collect_strategy)
+
+---------------------------------------------implementation/elements/include/coal.hpp
+
+#pragma once
+#include "resource.hpp"
+#include "vector_2d.hpp"
+#include "color.hpp"
+#include "shape_type.hpp"
+
+class Coal: public Resource
+{
+public:
+    Coal(const Vector2D& coordinates, int size, Color color, ShapeType shape);
+    int dimensions() const override;
+    Color color() const override;
+    ShapeType shape() const override;
+    Vector2D position() const override;
+};
+
+---------------------------------------------implementation/elements/include/iron.hpp
+
+#pragma once
+#include "resource.hpp"
+#include "vector_2d.hpp"
+#include "color.hpp"
+#include "shape_type.hpp"
+
+class Iron: public Resource
+{
+public:
+    Iron(const Vector2D& coordinates, int size, Color color, ShapeType shape);
+    int dimensions() const override;
+    Color color() const override;
+    ShapeType shape() const override;
+    Vector2D position() const override;
+};
+
+---------------------------------------------implementation/elements/include/player.hpp
+
+#pragma once
+#include <vector>
+#include <memory>
+#include "vector_2d.hpp"
+#include "resource.hpp"
+#include "color.hpp"
+#include "shape_type.hpp"
+#include "resource_map.hpp"
+#include "strategy.hpp"
+
+class Player
+{
+private:
+    std::vector<std::shared_ptr<Resource>> resources;
+    Color shapeColor;
+    ShapeType shapeType;
+    Vector2D coords;
+    void makeStep(Vector2D destination);
+public:
+    Player(Vector2D coords);
+    Color color() const;
+    ShapeType shape() const;
+    Vector2D position() const;
+    void gatherResources(int speed, ResourceMap& map, const std::unique_ptr<Strategy> strategy);
+};
+
+---------------------------------------------implementation/elements/include/resource.hpp
+
+#pragma once
+#include "vector_2d.hpp"
+#include "color.hpp"
+#include "shape_type.hpp"
+#include <memory>
+
+class Resource
+{
+protected:
+    int size;
+    Color shapeColor;
+    ShapeType shapeType;
+    Vector2D coords;
+public:
+    Resource(const Vector2D& coordinates, int size, Color color, ShapeType shape);
+    virtual ~Resource() = default;
+    virtual int dimensions() const = 0;
+    virtual Color color() const = 0;
+    virtual ShapeType shape() const = 0;
+    virtual Vector2D position() const = 0;
+};
+
+---------------------------------------------implementation/elements/include/stone.hpp
+
+#pragma once
+#include "resource.hpp"
+#include "vector_2d.hpp"
+#include "color.hpp"
+#include "shape_type.hpp"
+
+class Stone: public Resource
+{
+public:
+    Stone(const Vector2D& coordinates, int size, Color color, ShapeType shape);
+    int dimensions() const override;
+    Color color() const override;
+    ShapeType shape() const override;
+    Vector2D position() const override;
+};
+
+---------------------------------------------implementation/elements/include/wood.hpp
+
+#pragma once
+#include "resource.hpp"
+#include "vector_2d.hpp"
+#include "color.hpp"
+#include "shape_type.hpp"
+
+class Wood: public Resource
+{
+public:
+    Wood(const Vector2D& coordinates, int size, Color color, ShapeType shape);
+    int dimensions() const override;
+    Color color() const override;
+    ShapeType shape() const override;
+    Vector2D position() const override;
+};
+
+---------------------------------------------implementation/elements/src/coal.cpp
+
+#include "coal.hpp"
+
+Coal::Coal(const Vector2D& coordinates, int sz, Color clr, ShapeType sht): 
+    Resource(coordinates, sz, clr, sht){}
+
+int Coal::dimensions() const
+{
+    return size;
+}
+
+Color Coal::color() const
+{
+    return shapeColor;
+}
+
+ShapeType Coal::shape() const
+{
+    return shapeType;
+}
+
+Vector2D Coal::position() const
+{
+    return coords;
+}
+
+
+---------------------------------------------implementation/elements/src/iron.cpp
+
+#include "iron.hpp"
+
+Iron::Iron(const Vector2D& coordinates, int sz, Color clr, ShapeType sht): 
+    Resource(coordinates, sz, clr, sht){}
+
+int Iron::dimensions() const
+{
+    return size;
+}
+
+Color Iron::color() const
+{
+    return shapeColor;
+}
+
+ShapeType Iron::shape() const
+{
+    return shapeType;
+}
+
+Vector2D Iron::position() const
+{
+    return coords;
+}
+
+---------------------------------------------implementation/elements/src/player.cpp
+
+#include "player.hpp"
+#include <thread>
+#include <chrono>
+#include <iostream>
+
+Player::Player(Vector2D coordinates)
+{
+    shapeType = ShapeType::PLAYER;
+    shapeColor = Color::WHITE;
+    coords = coordinates;
+}
+
+Vector2D Player::position() const
+{
+    return coords;
+}
+
+Color Player::color() const
+{
+    return shapeColor;
+}
+
+ShapeType Player::shape() const
+{
+    return shapeType;
+}
+
+void Player::makeStep(Vector2D destination)
+{
+    if (coords.x() < destination.x())
+    {
+        coords = Vector2D(coords.x() + 1, coords.y());
+    }
+    else if (coords.x() > destination.x())
+    {
+        coords = Vector2D(coords.x() - 1, coords.y());
+    }
+
+    if (coords.y() < destination.y())
+    {
+        coords = Vector2D(coords.x(), coords.y() + 1);
+    }
+    else if (coords.y() > destination.y())
+    {
+        coords = Vector2D(coords.x(), coords.y() - 1);
+    }
+}
+
+void Player::gatherResources(int speed, ResourceMap& map, const std::unique_ptr<Strategy> strategy)
+{
+    auto res = strategy->targetResource(map.getResources(), coords);
+    if (!res) return;
+
+    if (coords != res->position())
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(speed));
+        makeStep(res->position());
+    }
+    else
+    {
+        map.removeResource(res);
+        resources.push_back(res);
+    }
+}
+
+
+---------------------------------------------implementation/elements/src/resource.cpp
+
+#include "resource.hpp"
+
+Resource::Resource(const Vector2D& coordinates, int sz, Color clr, ShapeType sht): 
+    coords(coordinates), size(sz), shapeColor(clr), shapeType(sht){}
+
+
+---------------------------------------------implementation/elements/src/stone.cpp
+
+#include "stone.hpp"
+
+Stone::Stone(const Vector2D& coordinates, int sz, Color clr, ShapeType sht): 
+    Resource(coordinates, sz, clr, sht){}
+
+int Stone::dimensions() const
+{
+    return size;
+}
+
+Color Stone::color() const
+{
+    return shapeColor;
+}
+
+ShapeType Stone::shape() const
+{
+    return shapeType;
+}
+
+Vector2D Stone::position() const
+{
+    return coords;
+}
+
+---------------------------------------------implementation/elements/src/wood.cpp
+
+#include "wood.hpp"
+
+Wood::Wood(const Vector2D& coordinates, int sz, Color clr, ShapeType sht): 
+    Resource(coordinates, sz, clr, sht){}
+
+int Wood::dimensions() const
+{
+    return size;
+}
+
+Color Wood::color() const
+{
+    return shapeColor;
+}
+
+ShapeType Wood::shape() const
+{
+    return shapeType;
+}
+
+Vector2D Wood::position() const
+{
+    return coords;
+}
+
+---------------------------------------------implementation/environment/CMakeLists.txt
+
+add_library(environment STATIC)
+target_sources(environment PRIVATE 
+    src/window.cpp
+    src/world.cpp
+    src/resource_map.cpp
+)
+target_include_directories(environment PUBLIC include)
+target_link_libraries(environment PUBLIC
+    SFML::Graphics
+    SFML::Window
+    SFML::System
+    utils 
+    elements)
+
+---------------------------------------------implementation/environment/include/resource_map.hpp
+
+#pragma once
+#include "resource.hpp"
+#include <vector>
+#include <memory>
+
+class ResourceMap
+{
+private:
+    std::vector<std::shared_ptr<Resource>> resources;
+public:
+    std::vector<std::shared_ptr<Resource>> getResources() const;
+    void addResource(std::shared_ptr<Resource>);
+    void removeResource(std::shared_ptr<Resource>);
+};
+
+---------------------------------------------implementation/environment/include/window.hpp
+
+#pragma once
+#include <SFML/Graphics.hpp>
+#include <memory>
+#include <string>
+#include "vector_2d.hpp"
+#include "color.hpp"
+#include "shape_type.hpp"
+
+class Window
+{
+private:
+    sf::RenderWindow window;
+    sf::CircleShape createShape(int size, ShapeType shapeType);
+    void fillColor(sf::CircleShape& shape, Color color);
+    bool checkForCloseCommand();
+public:
+    Window(unsigned int width, unsigned int height);
+    bool isCreated();
+    void refresh();
+    void draw(int size, ShapeType shapeType, Color color, Vector2D coords);
+};
+
+---------------------------------------------implementation/environment/include/world.hpp
+
+#pragma once
+#include <vector>
+#include <memory>
+#include "window.hpp"
+#include "resource.hpp"
+#include "player.hpp"
+
+class World
+{
+private:
+    std::vector<std::shared_ptr<Player>> players;
+    std::shared_ptr<Window> window;
+public:
+    World(std::shared_ptr<Window> w);
+    void addPlayer(std::shared_ptr<Player>);
+    void removePlayer(std::shared_ptr<Player>);
+    void displayAllResources(std::vector<std::shared_ptr<Resource>> resources);
+    void displayAllPlayers();
+};
+
+---------------------------------------------implementation/environment/include/resource_map.cpp
+
+#include "resource_map.hpp"
+#include <algorithm>
+
+std::vector<std::shared_ptr<Resource>> ResourceMap::getResources() const
+{
+    return resources;
+}
+
+void ResourceMap::addResource(std::shared_ptr<Resource> resource)
+{
+    resources.push_back(resource);
+}   
+    
+void ResourceMap::removeResource(std::shared_ptr<Resource> resource)
+{
+    resources.erase(
+        std::remove_if(resources.begin(), resources.end(),
+            [&resource](const std::shared_ptr<Resource>& r) {
+                return r == resource;
+            }),
+        resources.end()
+    );
+}
+
+---------------------------------------------implementation/environment/include/window.cpp
+
+#include "window.hpp"
+
+Window::Window(unsigned int width, unsigned int height) 
+    : window(sf::VideoMode({width, height}), "My Craft") {}
+
+bool Window::isCreated()
+{
+    return window.isOpen();
+}
+
+void Window::refresh()
+{
+    if (checkForCloseCommand())
+    {
+        window.close();
+    }
+    window.clear();
+}
+
+sf::CircleShape Window::createShape(int size, ShapeType shapeType)
+{
+    switch (shapeType)
+    {
+    case ShapeType::CIRCLE:
+        return sf::CircleShape(size);
+        break;
+    case ShapeType::TRIANGLE:
+        return sf::CircleShape(size, 3);
+        break;
+    case ShapeType::SQUARE:
+        return sf::CircleShape(size, 4);
+        break;
+    case ShapeType::HEXAGONE:
+        return sf::CircleShape(size, 6);
+        break;
+    case ShapeType::PLAYER:
+        return sf::CircleShape(size);
+        break;
+    default:
+        return sf::CircleShape(size);
+        break;
+    }
+}
+
+void Window::fillColor(sf::CircleShape& shape, Color color)
+{
+    switch (color)
+    {
+    case Color::RED:
+        shape.setFillColor(sf::Color::Red);
+        break;
+    case Color::GREEN:
+        shape.setFillColor(sf::Color::Green);
+        break;
+    case Color::BLUE:
+        shape.setFillColor(sf::Color::Blue);
+        break;
+    case Color::YELLOW:
+        shape.setFillColor(sf::Color::Yellow);
+        break;
+    case Color::WHITE:
+        shape.setFillColor(sf::Color::White);
+        break;
+    }
+}
+
+void Window::draw(int size, ShapeType shapeType, Color color, Vector2D coords)
+{
+    sf::CircleShape shape = createShape(size, shapeType);
+    fillColor(shape, color);
+    shape.setPosition({static_cast<float>(coords.x()), static_cast<float>(coords.y())});
+    window.draw(shape);
+    window.display();
+}
+
+bool Window::checkForCloseCommand()
+{
+    bool res = false;
+    while (auto eventOpt = window.pollEvent()) {
+        if (eventOpt->is<sf::Event::Closed>()) {
+            res = true;
+        }
+    }
+    return res;
+}
+
+---------------------------------------------implementation/environment/include/world.cpp
+
+#include "world.hpp"
+#include <algorithm>
+
+World::World(std::shared_ptr<Window> w): window(w){}
+
+void World::displayAllResources(std::vector<std::shared_ptr<Resource>> resources)
+{
+    for(const auto& item : resources) 
+    {
+        window->draw(item->dimensions(), item->shape(), item->color(), item->position());
+    }
+}
+
+void World::displayAllPlayers()
+{
+    for(const auto& item : players)
+    {
+        window->draw(15, item->shape(), item->color(), item->position());
+    }
+}
+
+void World::addPlayer(std::shared_ptr<Player> player)
+{
+    players.push_back(player);
+}
+
+void World::removePlayer(std::shared_ptr<Player> player)
+{
+    players.erase(
+        std::remove_if(players.begin(), players.end(),
+            [&player](const std::shared_ptr<Player>& p) {
+                return p == player;
+            }),
+        players.end()
+    );
+}
+
+---------------------------------------------implementation/factory/CMakeLists.txt
+
+add_library(factory STATIC)
+target_sources(factory PRIVATE 
+    src/resource_factory.cpp
+    src/plugin_loader.cpp
+)
+
+target_include_directories(factory PUBLIC include)
+target_link_libraries(factory PUBLIC utils elements)
+
+set(PLUGIN_OUTPUT_DIR ${CMAKE_BINARY_DIR}/plugins)
+
+add_library(coal_plugin MODULE plugins/coal_plugin.cpp)
+target_include_directories(coal_plugin PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(coal_plugin PRIVATE factory utils elements)
+set_target_properties(coal_plugin PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PLUGIN_OUTPUT_DIR})
+
+add_library(iron_plugin MODULE plugins/iron_plugin.cpp)
+target_include_directories(iron_plugin PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(iron_plugin PRIVATE factory utils elements)
+set_target_properties(iron_plugin PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PLUGIN_OUTPUT_DIR})
+
+add_library(stone_plugin MODULE plugins/stone_plugin.cpp)
+target_include_directories(stone_plugin PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(stone_plugin PRIVATE factory utils elements)
+set_target_properties(stone_plugin PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PLUGIN_OUTPUT_DIR})
+
+add_library(wood_plugin MODULE plugins/wood_plugin.cpp)
+target_include_directories(wood_plugin PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(wood_plugin PRIVATE factory utils elements)
+set_target_properties(wood_plugin PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PLUGIN_OUTPUT_DIR})
+
+---------------------------------------------implementation/factory/include/plugin_loader.hpp
+
+#pragma once
+
+#include <string>
+#include <vector>
+#include "resource_factory.hpp"
+
+class PluginLoader
+{
+public:
+    ~PluginLoader();
+
+    void loadPlugin(const std::string& path, ResourceFactory& factory);
+
+private:
+    std::vector<void*> handles;
+};
+
+---------------------------------------------implementation/factory/include/resource_factory.hpp
+
+#pragma once
+#include <memory>
+#include <unordered_map>
+#include <functional>
+#include <string>
+#include "resource.hpp"
+#include "vector_2d.hpp"
+#include "color.hpp"
+#include "shape_type.hpp"
+
+using ResourceMaker = std::function<std::unique_ptr<Resource>(const Vector2D& coordinates, 
+    int size, Color color, ShapeType shape)>;
+
+
+class ResourceFactory
+{
+public:
+    std::unique_ptr<Resource> makeResource(const std::string& type, const Vector2D& coordinates, 
+        int size, Color color, ShapeType shape) const;
+    void registerMaker(const std::string& type, ResourceMaker maker);
+private:
+    std::unordered_map<std::string, ResourceMaker> makers;
+};
+
+---------------------------------------------implementation/factory/include/plugin_loader.cpp
+
+#include "plugin_loader.hpp"
+
+#include <dlfcn.h>
+#include <stdexcept>
+#include <string>
+
+using RegisterPluginFn = void (*)(ResourceFactory&);
+
+PluginLoader::~PluginLoader()
+{
+    for (void* handle : handles)
+    {
+        if (handle)
+        {
+            dlclose(handle);
+        }
+    }
+}
+
+void PluginLoader::loadPlugin(const std::string& path, ResourceFactory& factory)
+{
+    void* handle = dlopen(path.c_str(), RTLD_NOW);
+    if (!handle)
+    {
+        throw std::runtime_error(std::string("dlopen failed: ") + dlerror());
+    }
+
+    dlerror();
+
+    auto registerFn =
+        reinterpret_cast<RegisterPluginFn>(dlsym(handle, "registerPlugin"));
+
+    const char* error = dlerror();
+    if (error != nullptr)
+    {
+        dlclose(handle);
+        throw std::runtime_error(std::string("dlsym failed: ") + error);
+    }
+
+    registerFn(factory);
+    handles.push_back(handle);
+}
+
+---------------------------------------------implementation/factory/include/resource_factory.cpp
+
+#include "resource_factory.hpp"
+
+
+std::unique_ptr<Resource> ResourceFactory::makeResource(const std::string& type, const Vector2D& coordinates, 
+        int size, Color color, ShapeType shape) const
+{
+    auto maker = makers.at(type);
+    return maker(coordinates, size, color, shape);
+}
+
+void ResourceFactory::registerMaker(const std::string& type, ResourceMaker maker)
+{
+    makers[type] = maker;
+}
+
+---------------------------------------------implementation/factory/plugins/coal_plugin.cpp
+
+#include "resource_factory.hpp"
+#include "coal.hpp"
+
+#include <memory>
+
+extern "C" void registerPlugin(ResourceFactory& factory)
+{
+    factory.registerMaker(
+        "coal",
+        [](const Vector2D& coordinates, int size, Color color, ShapeType shape)
+            -> std::unique_ptr<Resource>
+        {
+            return std::make_unique<Coal>(coordinates, size, color, shape);
+        });
+}
+
+---------------------------------------------implementation/factory/plugins/iron_plugin.cpp
+
+#include "resource_factory.hpp"
+#include "iron.hpp"
+
+#include <memory>
+
+extern "C" void registerPlugin(ResourceFactory& factory)
+{
+    factory.registerMaker(
+        "iron",
+        [](const Vector2D& coordinates, int size, Color color, ShapeType shape)
+            -> std::unique_ptr<Resource>
+        {
+            return std::make_unique<Iron>(coordinates, size, color, shape);
+        });
+}
+
+---------------------------------------------implementation/factory/plugins/stone_plugin.cpp
+
+#include "resource_factory.hpp"
+#include "stone.hpp"
+
+#include <memory>
+
+extern "C" void registerPlugin(ResourceFactory& factory)
+{
+    factory.registerMaker(
+        "stone",
+        [](const Vector2D& coordinates, int size, Color color, ShapeType shape)
+            -> std::unique_ptr<Resource>
+        {
+            return std::make_unique<Stone>(coordinates, size, color, shape);
+        });
+}
+
+---------------------------------------------implementation/factory/plugins/wood_plugin.cpp
+
+#include "resource_factory.hpp"
+#include "wood.hpp"
+
+#include <memory>
+
+extern "C" void registerPlugin(ResourceFactory& factory)
+{
+    factory.registerMaker(
+        "wood",
+        [](const Vector2D& coordinates, int size, Color color, ShapeType shape)
+            -> std::unique_ptr<Resource>
+        {
+            return std::make_unique<Wood>(coordinates, size, color, shape);
+        });
+}
+
+---------------------------------------------implementation/resource_collect_strategy/CMakeLists.txt
+
+add_library(collect_strategy STATIC)
+target_sources(collect_strategy PRIVATE 
+    src/closest_point_strategy.cpp
+    src/greedy_strategy.cpp
+)
+
+target_include_directories(collect_strategy PUBLIC include)
+target_link_libraries(collect_strategy PUBLIC environment utils)
+
+
+---------------------------------------------implementation/resource_collect_strategy/include/closest_point_strategy.hpp
+
+#pragma once
+#include "strategy.hpp"
+
+class ClosestPointStrategy : public Strategy
+{
+public:
+    std::shared_ptr<Resource> targetResource(
+        const std::vector<std::shared_ptr<Resource>>& resources,
+        const Vector2D& coords) const override;
+};
+
+
+---------------------------------------------implementation/resource_collect_strategy/include/greedy_strategy.hpp
+
+#pragma once
+#include "strategy.hpp"
+
+class GreedyStrategy : public Strategy
+{
+public:
+    std::shared_ptr<Resource> targetResource(
+        const std::vector<std::shared_ptr<Resource>>& resources,
+        const Vector2D& coords) const override;
+};
+
+
+---------------------------------------------implementation/resource_collect_strategy/include/strategy.hpp
+
+#pragma once
+#include "resource.hpp"
+#include "vector_2d.hpp"
+#include <memory>
+#include <vector>
+
+class Strategy
+{
+public:
+    virtual ~Strategy() = default;
+
+    virtual std::shared_ptr<Resource> targetResource(
+        const std::vector<std::shared_ptr<Resource>>& resources,
+        const Vector2D& coords) const = 0;
+};
+
+
+
+
+---------------------------------------------implementation/resource_collect_strategy/include/closest_point_strategy.cpp
+
+#include "closest_point_strategy.hpp"
+#include <limits>
+
+std::shared_ptr<Resource> ClosestPointStrategy::targetResource(
+    const std::vector<std::shared_ptr<Resource>>& resources,
+    const Vector2D& coords) const
+{
+    std::shared_ptr<Resource> result;
+    float minDist = std::numeric_limits<float>::max();
+
+    for (const auto& item : resources)
+    {
+        if (!item) continue;
+        float dist = coords.distance(item->position());
+        if (dist < minDist)
+        {
+            result = item;
+            minDist = dist;
+        }
+    }
+    return result;
+}
+
+
+
+---------------------------------------------implementation/resource_collect_strategy/include/greedy_strategy.cpp
+
+#include "greedy_strategy.hpp"
+
+std::shared_ptr<Resource> GreedyStrategy::targetResource(
+    const std::vector<std::shared_ptr<Resource>>& resources,
+    const Vector2D& coords) const
+{
+    std::shared_ptr<Resource> result;
+    std::size_t bestSize = 0;
+
+    for (const auto& item : resources)
+    {
+        if (!item) continue;
+        if (item->dimensions() >= bestSize)
+        {
+            result = item;
+            bestSize = item->dimensions();
+        }
+    }
+    return result;
+}
+
+
+---------------------------------------------implementation/utils/CMakeLists.txt
+
+add_library(utils STATIC)
+target_sources(utils PRIVATE src/vector_2d.cpp)
+target_include_directories(utils PUBLIC include)
+
+---------------------------------------------implementation/utils/include/color.hpp
+
+#pragma once
+
+enum Color
+{
+    RED,
+    GREEN,
+    BLUE, 
+    YELLOW,
+    WHITE
+};
+
+---------------------------------------------implementation/utils/include/shape_type.hpp
+
+#pragma once
+
+enum ShapeType
+{
+    CIRCLE,
+    TRIANGLE,
+    SQUARE, 
+    HEXAGONE,
+    PLAYER
+};
+
+---------------------------------------------implementation/utils/include/vector2_d.hpp
+
+#pragma once
+
+
+class Vector2D
+{
+private:
+    float  X;
+    float  Y;
+public:
+    Vector2D() = default;
+    Vector2D(float  x, float  y);
+    Vector2D(const Vector2D& other);
+    Vector2D(Vector2D&& other) noexcept;
+
+    float  x() const;
+    float  y() const;
+    float distance(const Vector2D& other) const;
+
+    Vector2D operator+(const Vector2D& other) const;
+    Vector2D operator-(const Vector2D& other) const;
+    Vector2D operator*(float  scalar) const;
+    Vector2D operator/(float  scalar) const;
+    Vector2D& operator+=(const Vector2D& other);
+    Vector2D& operator-=(const Vector2D& other);
+    Vector2D& operator*=(float  scalar);
+    Vector2D& operator/=(float  scalar);
+
+    Vector2D& operator=(const Vector2D& other); 
+    Vector2D& operator=(Vector2D&& other) noexcept;
+
+    bool operator==(const Vector2D& other) const;
+    bool operator!=(const Vector2D& other) const;
+    bool operator<(const Vector2D& other) const;
+    bool operator>(const Vector2D& other) const;
+    bool operator<=(const Vector2D& other) const;
+    bool operator>=(const Vector2D& other) const;
+};
+
+---------------------------------------------implementation/utils/include/vector2_d.cpp
+
+#include "vector_2d.hpp"
+#include "math.h"
+
+
+Vector2D::Vector2D(float  x, float  y): X(x), Y(y){}
+
+Vector2D::Vector2D(const Vector2D& other) : X(other.X), Y(other.Y) {}
+
+Vector2D::Vector2D(Vector2D&& other) noexcept : X(other.X), Y(other.Y) {}
+
+float  Vector2D::x() const
+{
+    return X;
+}
+
+float  Vector2D::y() const
+{
+    return Y;
+}
+
+float Vector2D::distance(const Vector2D& other) const
+{
+    float dx = static_cast<float>(X - other.X);
+    float dy = static_cast<float>(Y - other.Y);
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+Vector2D Vector2D::operator+(const Vector2D& other) const {
+    return Vector2D(X + other.X, Y + other.Y);
+}
+
+Vector2D Vector2D::operator-(const Vector2D& other) const {
+    return Vector2D(X - other.X, Y - other.Y);
+}
+
+Vector2D Vector2D::operator*(float  scalar) const {
+    return Vector2D(X * scalar, Y * scalar);
+}
+
+Vector2D Vector2D::operator/(float  scalar) const {
+    if (scalar == 0) return *this;
+    return Vector2D(X / scalar, Y / scalar);
+}
+
+Vector2D& Vector2D::operator+=(const Vector2D& other) {
+    X += other.X;
+    Y += other.Y;
+    return *this;
+}
+
+Vector2D& Vector2D::operator-=(const Vector2D& other) {
+    X -= other.X;
+    Y -= other.Y;
+    return *this;
+}
+
+Vector2D& Vector2D::operator*=(float  scalar) {
+    X *= scalar;
+    Y *= scalar;
+    return *this;
+}
+
+Vector2D& Vector2D::operator/=(float  scalar) {
+    if (scalar != 0) {
+        X /= scalar;
+        Y /= scalar;
+    }
+    return *this;
+}
+
+Vector2D& Vector2D::operator=(const Vector2D& other) {
+    if (this != &other) {
+        X = other.X;
+        Y = other.Y;
+    }
+    return *this;
+}
+
+
+Vector2D& Vector2D::operator=(Vector2D&& other) noexcept {
+    if (this != &other) {
+        X = other.X;
+        Y = other.Y;
+    }
+    return *this;
+}
+
+bool Vector2D::operator==(const Vector2D& other) const {
+    return X == other.X && Y == other.Y;
+}
+
+bool Vector2D::operator!=(const Vector2D& other) const {
+    return !(*this == other);
+}
+
+bool Vector2D::operator<(const Vector2D& other) const {
+    return distance(Vector2D(0, 0)) < other.distance(Vector2D(0, 0));
+}
+
+bool Vector2D::operator>(const Vector2D& other) const {
+    return distance(Vector2D(0, 0)) > other.distance(Vector2D(0, 0));
+}
+
+bool Vector2D::operator<=(const Vector2D& other) const {
+    return *this < other || *this == other;
+}
+
+bool Vector2D::operator>=(const Vector2D& other) const {
+    return *this > other || *this == other;
+}
+
+
+---------------------------------------------implementation/build.sh
+
+#!/bin/bash
+
+rm -rf build
+cmake -S . -B build
+cmake --build build
+
+---------------------------------------------implementation/run.sh
+
+#!/bin/bash
+
+cd build
+./my_craft
+
+---------------------------------------------implementation/main.cpp
+
+#include "window.hpp"
+#include "world.hpp"
+#include "resource_factory.hpp"
+#include "plugin_loader.hpp"
+#include "resource_map.hpp"
+#include <memory>
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include "closest_point_strategy.hpp"
+#include "greedy_strategy.hpp"
+
+
+void fillMapWithResources(ResourceMap& map, ResourceFactory& resourceFactory)
+{
+    auto coal = resourceFactory.makeResource("coal", Vector2D(100, 200), 10, Color::BLUE, ShapeType::CIRCLE);
+    auto iron = resourceFactory.makeResource("iron", Vector2D(10, 20), 15, Color::GREEN, ShapeType::HEXAGONE);
+    auto stone = resourceFactory.makeResource("stone", Vector2D(60, 60), 20, Color::RED, ShapeType::SQUARE);
+    auto wood = resourceFactory.makeResource("wood", Vector2D(1, 400), 25, Color::YELLOW, ShapeType::TRIANGLE);
+
+    map.addResource(std::move(coal));
+    map.addResource(std::move(iron));
+    map.addResource(std::move(stone));
+    map.addResource(std::move(wood));
+}
+
+std::shared_ptr<Player> createPlayerOnTheField(World& world)
+{
+    auto player = std::make_shared<Player>(Vector2D(200, 10));
+    world.addPlayer(player);
+    return player;
+}
+
+
+int main()
+{
+    auto window = std::make_shared<Window>(640, 480);
+    World world(window);
+
+    ResourceFactory resourceFactory;
+    PluginLoader pluginLoader;
+    ResourceMap map;
+
+    pluginLoader.loadPlugin("./plugins/libcoal_plugin.so", resourceFactory);
+    pluginLoader.loadPlugin("./plugins/libiron_plugin.so", resourceFactory);
+    pluginLoader.loadPlugin("./plugins/libstone_plugin.so", resourceFactory);
+    pluginLoader.loadPlugin("./plugins/libwood_plugin.so", resourceFactory);
+
+    fillMapWithResources(map, resourceFactory);
+    auto player = createPlayerOnTheField(world);
+    
+    while (window->isCreated()) 
+    {
+        window->refresh();
+        world.displayAllResources(map.getResources());
+        world.displayAllPlayers();
+        player->gatherResources(10, map, std::make_unique<ClosestPointStrategy>());
+    }
+    return 0;
+}
+
+---------------------------------------------implementation/CMakeLists.txt
+
+cmake_minimum_required(VERSION 3.16)
+
+project(my_craft LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+set(SFML_STATIC_LIBRARIES TRUE)
+find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System)
+
+add_subdirectory(utils)
+add_subdirectory(environment)
+add_subdirectory(elements)
+add_subdirectory(resource_collect_strategy)
+add_subdirectory(factory)
+
+add_executable(my_craft main.cpp)
+
+target_link_libraries(my_craft PRIVATE 
+    utils 
+    environment 
+    elements
+    collect_strategy
+    factory
+    SFML::Graphics
+    SFML::Window
+    SFML::System
+)
+
+---------------------------------------------sfml_basic_example/CMakeLists.txt
+
+cmake_minimum_required(VERSION 3.16)
+
+project(sfml_hello LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_executable(sfml_hello
+    main.cpp
+)
+
+
+list(APPEND CMAKE_PREFIX_PATH "/usr/lib/x86_64-linux-gnu/cmake/SFML")
+
+find_package(SFML 2.5 REQUIRED COMPONENTS graphics window system)
+
+if(SFML_FOUND)
+    target_include_directories(sfml_hello PRIVATE ${SFML_INCLUDE_DIR})
+    target_link_libraries(sfml_hello PRIVATE
+        sfml-graphics
+        sfml-window
+        sfml-system
+    )
+endif()
+
+
+---------------------------------------------sfml_basic_example/build.sh
+
+#!/bin/bash
+
+rm -rf build
+cmake -S . -B build
+cmake --build build
+
+---------------------------------------------sfml_basic_example/run.sh
+
+#!/bin/bash
+
+cd build
+./sfml_hello
+
+---------------------------------------------sfml_basic_example/main.cpp
+
+#include <SFML/Graphics.hpp>
+#include <memory>
+
+int main()
+{
+    sf::RenderWindow window(sf::VideoMode(640, 480), "Hello World");
+    sf::CircleShape shape(200);
+    std::shared_ptr<sf::Shape> sh = std::make_shared<sf::CircleShape>(sf::CircleShape(100, 3));
+    sh->setFillColor(sf::Color::Red);
+
+    while (window.isOpen()) 
+    {
+        sf::Event event;
+        while (window.pollEvent(event))
+        {
+            if (event.type ==sf::Event::Closed)
+            {
+                window.close();
+            }
+        }
+        window.clear();
+        window.draw(shape);
+        window.draw(*sh);
+        window.display();
+    }
+    return 0;
+}

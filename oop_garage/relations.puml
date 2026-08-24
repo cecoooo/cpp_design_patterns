@@ -1,0 +1,7 @@
+@startuml
+Car o--> "4" Tire
+Car *--> "1" Engine
+Garage --> Player
+Player o--> "*" Car
+Race o--> "*" Player
+@enduml

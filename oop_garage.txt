@@ -1,0 +1,648 @@
+---------------------------------------/oop_garage/include/bank_account.hpp
+
+#pragma once
+#include "money_adder.hpp"
+#include "money_subtractor.hpp"
+#include <string>
+
+class BankAccount: public MoneyAdder, public MoneySubtractor
+{
+private:
+    long long cents_amount = 0;
+public:
+    BankAccount() = default;
+    void addMoney(long long wholePart, long centPart) override;
+    void subtractMoney(long long wholePart, long centPart) override;
+    std::string showBalance() const;
+    long long getBalance() const;
+};
+
+---------------------------------------/oop_garage/include/car.hpp
+
+#pragma once
+#include "engine.hpp"
+#include "tire.hpp"
+#include <utility>
+#include <vector>
+
+class Car
+{
+private:
+    std::vector<Tire> tires;
+    Engine engine;
+public:
+    Car(const Engine& eng, std::vector<Tire> tires);
+    void changeTires(std::vector<Tire> tires);
+    std::vector<Tire> getTires() const;
+    void updateEngine(const Engine& engine);
+    Engine getEngine() const;
+};
+
+---------------------------------------/oop_garage/include/engine.hpp
+
+#pragma once
+
+class Engine
+{
+private:
+    int volume;
+    int horse_powers;
+public:
+    Engine(int vol, int hp);
+    int getVolumeInCubicCm();
+    int getPower();
+};
+
+---------------------------------------/oop_garage/include/garage.hpp
+
+#pragma once
+#include "player.hpp"
+#include <string>
+
+class Garage
+{
+private:
+    bool checkCarId(const Player& player, unsigned int carId);
+public:
+    void changeTires(const std::string& qualityOfTire, Player& player, unsigned int carId);
+    void updateEngine(int vol, const int hp, Player& player, unsigned int carId);
+};
+
+---------------------------------------/oop_garage/include/money_adder.hpp
+
+#pragma once
+
+struct MoneyAdder {
+    virtual ~MoneyAdder() = default;
+    virtual void addMoney(long long wholePart, long centPart) = 0;
+};
+
+---------------------------------------/oop_garage/include/money_subtractor.hpp
+
+#pragma once
+
+struct MoneySubtractor {
+    virtual ~MoneySubtractor() = default;
+    virtual void subtractMoney(long long wholePart, long centPart) = 0;
+};
+
+---------------------------------------/oop_garage/include/player.hpp
+
+#pragma once
+#include "car.hpp"
+#include <string>
+#include <vector>
+#include <memory>
+
+class Player
+{
+private:
+    std::string name;
+    long double money;
+    std::vector<std::shared_ptr<Car>> cars;
+public:
+    Player(const std::string& name);
+    long double getBankBalance();
+    void addMoneyToAccount(long double sum);
+    std::string getName() const;
+    void addCar(std::shared_ptr<Car> car);
+    void removeCar(unsigned int carId);
+    std::vector<std::shared_ptr<Car>> getAllCars() const;
+    void subtractMoneyFromAccount(long double sum);
+};
+
+---------------------------------------/oop_garage/include/race.hpp
+
+#pragma once
+#include "player.hpp"
+#include <memory>
+#include <string>
+#include <vector>
+#include <unordered_map>
+
+class Race
+{
+private:
+    std::unordered_map<std::shared_ptr<Player>, long double> allTimeRegister;
+    std::string raceName;
+    std::vector<std::pair<std::shared_ptr<Player>, int>> contenders;
+    long double moneyAward;
+    void determineWinner();
+    long double determineScore(std::pair<std::shared_ptr<Player>, int> contender);
+    void endRace();
+    std::shared_ptr<Player> winner;
+public:
+    Race(const std::string& name, long double award);
+    ~Race();
+    void startRace(std::vector<std::pair<std::shared_ptr<Player>, int>> conts);
+    std::shared_ptr<Player> getLastWinner() const;
+    std::string getName() const;
+    void updateAward(long double sum);
+    long double showAward() const;
+};
+
+---------------------------------------/oop_garage/include/tire.hpp
+
+#pragma once
+#include <string>
+
+
+enum TireType{
+    CHEEP,
+    MIDDLE,
+    EXPENSIVE,
+    UNKNOWN
+};
+
+
+class Tire
+{
+private:
+    TireType tireType;
+public:
+    Tire(const std::string& tType);
+    long double getPrice() const;
+};
+
+---------------------------------------/oop_garage/src/bank_account.cpp
+
+#include "bank_account.hpp"
+#include <iostream>
+
+
+void BankAccount::subtractMoney(long long wholePart, long centPart)
+{
+    if (wholePart < 0 || centPart < 0)
+    {
+        std::cerr << "Negative value amount could not be used to substract money" << std::endl;
+    }
+    else if(centPart > 99)
+    {
+        std::cerr << "Cent part must be in range 0-99" << std::endl;
+    }
+    else
+    {
+        cents_amount -= wholePart*100 + centPart;
+    }
+}
+
+void BankAccount::addMoney(long long wholePart, long centPart)
+{
+    if (wholePart < 0 || centPart < 0)
+    {
+        std::cerr << "Negative value amount could not be used to add money" << std::endl;
+    }
+    else if(centPart > 99)
+    {
+        std::cerr << "Cent part must be in range 0-99" << std::endl;
+    }
+    else
+    {
+        cents_amount += wholePart*100 + centPart;
+    }
+}
+
+
+std::string BankAccount::showBalance() const
+{
+    return std::to_string(cents_amount).insert(std::to_string(cents_amount).length()-2, ".");
+}
+
+long long BankAccount::getBalance() const
+{
+    return cents_amount;
+}
+
+---------------------------------------/oop_garage/src/car.cpp
+
+#include "car.hpp"
+#include <iostream>
+
+Car::Car(const Engine& eng, std::vector<Tire> trs): 
+engine(eng)
+{
+    tires.assign(trs.begin(), trs.end());
+}
+
+void Car::changeTires(std::vector<Tire> trs)
+{
+    tires.assign(trs.begin(), trs.end());
+}
+
+std::vector<Tire> Car::getTires() const
+{
+    return tires;
+}
+
+void Car::updateEngine(const Engine& engine)
+{
+    this->engine = engine;
+}
+
+Engine Car::getEngine() const
+{
+    return engine;
+}
+
+---------------------------------------/oop_garage/src/engine.cpp
+
+#include "engine.hpp"
+
+
+Engine::Engine(int vol, int hp): volume(vol), horse_powers(hp){}
+    
+int Engine::getVolumeInCubicCm()
+{
+    return volume;
+}
+    
+int Engine::getPower()
+{
+    return horse_powers;
+}
+
+---------------------------------------/oop_garage/src/garage.cpp
+
+#include "garage.hpp"    
+#include <iostream>
+
+void Garage::changeTires(const std::string& qualityOfTire, Player& player, unsigned int carId)
+{
+    if(!checkCarId(player, carId))
+    {
+        return;
+    }
+    std::vector<Tire> newTires;
+    for (size_t i = 0; i < 4; i++)
+    {
+        newTires.push_back(Tire(qualityOfTire));
+    }
+    player.getAllCars()[carId]->changeTires(newTires);
+    player.subtractMoneyFromAccount(player.getAllCars()[carId]->getTires()[0].getPrice() *4);
+}
+
+void Garage::updateEngine(int vol, const int hp, Player& player, unsigned int carId)
+{
+    if(!checkCarId(player, carId))
+    {
+        return;
+    }
+    Engine engine(vol, hp);
+    player.getAllCars()[carId]->updateEngine(engine);
+    player.subtractMoneyFromAccount(3000);
+}
+
+bool Garage::checkCarId(const Player& player, unsigned int carId)
+{
+    if(carId < player.getAllCars().size())
+    {
+        return true;
+    }
+    return false;
+}
+
+---------------------------------------/oop_garage/src/player.cpp
+
+#include "player.hpp"
+
+Player::Player(const std::string& name): 
+    name(name){}
+    
+
+long double Player::getBankBalance()
+{
+    return money;
+}
+    
+void Player::addMoneyToAccount(long double sum)
+{
+    money+=sum;
+}
+
+std::string Player::getName() const
+{
+    return name;
+}
+
+void Player::addCar(std::shared_ptr<Car> car)
+{
+    cars.push_back(car);
+}
+
+void Player::removeCar(unsigned int carId)
+{
+    if (carId < cars.size())
+    {
+        cars.erase(cars.begin() + carId);
+    }
+}
+
+std::vector<std::shared_ptr<Car>> Player::getAllCars() const
+{
+    return cars;
+}
+
+void Player::subtractMoneyFromAccount(long double sum)
+{
+    money-=sum;
+}
+
+---------------------------------------/oop_garage/src/race.cpp
+
+#include "race.hpp"
+#include <random>
+#include <iostream>
+
+    
+Race::Race(const std::string& name, long double award):raceName(name), moneyAward(award){}
+
+Race::~Race()
+{
+    allTimeRegister.clear();
+}
+
+std::string Race::getName() const
+{
+    return raceName;
+}
+
+void Race::startRace(std::vector<std::pair<std::shared_ptr<Player>, int>> conts)
+{
+    for (size_t i = 0; i < conts.size(); i++)
+    {
+        auto it = allTimeRegister.find(conts[i].first);
+        if (it == allTimeRegister.end())
+        {
+            allTimeRegister[conts[i].first] = 1;
+        }
+    }
+    contenders.assign(conts.begin(), conts.end());
+    determineWinner();
+    winner->addMoneyToAccount(moneyAward);
+    allTimeRegister[winner]++;
+    endRace();
+}
+
+void Race::determineWinner()
+{
+    std::vector<int> winner_indexes;
+    float maxScore = 0;
+    for (size_t i = 0; i < contenders.size(); i++)
+    {
+        float score = determineScore(contenders[i]);
+        std::cout << contenders[i].first->getName() << " Score: " << score << std::endl;
+        if(score > maxScore)
+        {
+            winner_indexes.clear();
+            maxScore = score;
+            winner_indexes.push_back(i);
+        }
+        else if(score == maxScore)
+        {
+            winner_indexes.push_back(i);
+        }
+    }
+    std::mt19937 gen{std::random_device{}()};
+    std::uniform_int_distribution<int> dist(0, winner_indexes.size()-1);
+
+    int picked = winner_indexes[dist(gen)];
+
+    std::cout << "Winner Score: " << maxScore << std::endl;
+    winner = contenders[picked].first;
+}
+
+long double Race::determineScore(std::pair<std::shared_ptr<Player>, int> contender)
+{
+    auto cars = contender.first->getAllCars();
+    auto tires = cars[contender.second]->getTires();
+
+    long double tirePrice = std::accumulate(
+        tires.begin(), tires.end(), 0.0L,
+        [](long double sum, const Tire& t) { return sum + t.getPrice(); }
+    );
+
+    return allTimeRegister[contender.first] * 
+                        (contender.first->getAllCars()[contender.second]->getEngine().getPower() +
+                        contender.first->getAllCars()[contender.second]->getEngine().getVolumeInCubicCm()) + tirePrice;
+
+}
+
+void Race::updateAward(long double sum)
+{
+    moneyAward+=sum;
+}
+
+long double Race::showAward() const
+{
+    return moneyAward;
+}
+
+std::shared_ptr<Player> Race::getLastWinner() const
+{
+    return winner;
+}
+
+void  Race::endRace()
+{
+    contenders.clear();
+}
+
+---------------------------------------/oop_garage/src/tire.cpp
+
+#include "tire.hpp"
+
+Tire::Tire(const std::string& tType) {
+    if (tType == "cheep")
+    {
+        tireType = TireType::CHEEP;
+    }
+    else if(tType == "middle")
+    {
+        tireType = TireType::MIDDLE;
+    }
+    else if(tType == "expensive")
+    {
+        tireType = TireType::EXPENSIVE;
+    }
+    else
+    {
+        tireType = TireType::UNKNOWN;
+    }
+}
+
+long double Tire::getPrice() const
+{
+    switch (tireType)
+    {
+    case TireType::CHEEP:
+        return 100L;
+        break;
+    case TireType::MIDDLE:
+        return 200L;
+        break;
+    case TireType::EXPENSIVE:
+        return 300L;
+        break;
+    default:
+        return 0L;
+        break;
+    }
+}
+
+---------------------------------------/oop_garage/build.sh
+
+#!/bin/bash
+
+set -e
+
+BUILD_DIR="build"
+
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+cd "$BUILD_DIR"
+
+cmake ..
+make -j"$(nproc)"
+
+echo "Build complete!"
+
+
+
+---------------------------------------/oop_garage/CMakeLists.txt
+
+cmake_minimum_required(VERSION 3.16)
+
+project(prj LANGUAGES CXX)
+
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(SOURCES
+    src/tire.cpp
+    src/engine.cpp
+    src/car.cpp
+    src/player.cpp
+    src/garage.cpp
+    src/race.cpp
+    main.cpp
+)
+
+add_executable(${PROJECT_NAME} ${SOURCES})
+
+# Public headers are in include/
+target_include_directories(${PROJECT_NAME}
+    PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+)
+
+
+---------------------------------------/oop_garage/main.cpp
+
+#include "player.hpp"
+#include "car.hpp"
+#include "race.hpp"
+#include "garage.hpp"
+#include <iostream>
+
+std::vector<Tire> produceTires(int t)
+{
+    std::string tType;
+    switch (t)
+    {
+    case 0:
+        tType == "cheep";
+        break;
+    case 1:
+        tType == "middle";
+        break;
+    case 2:
+        tType == "expensive";
+        break;
+    default:
+        break;
+    }
+
+    std::vector<Tire> res;
+    for (size_t i = 0; i < 4; i++)
+    {
+        res.push_back(Tire(tType));
+    }
+    return res;
+} 
+
+
+int main()
+{
+    std::shared_ptr<Player> playerA(new Player("PlayerA"));
+    std::shared_ptr<Player> playerB(new Player("PlayerB"));
+    std::shared_ptr<Player> playerC(new Player("PlayerC"));
+    std::shared_ptr<Player> playerD(new Player("PlayerD"));
+
+    std::shared_ptr<Car> carPlayerA1(new Car(Engine(2000, 150), produceTires(0)));
+    std::shared_ptr<Car> carPlayerB1(new Car(Engine(1900, 150), produceTires(2)));
+    std::shared_ptr<Car> carPlayerC1(new Car(Engine(3000, 240), produceTires(1)));
+    std::shared_ptr<Car> carPlayerD1(new Car(Engine(1200, 60), produceTires(0)));
+    std::shared_ptr<Car> carPlayerA2(new Car(Engine(3200, 300), produceTires(1)));
+    std::shared_ptr<Car> carPlayerB2(new Car(Engine(2500, 190), produceTires(2)));
+    std::shared_ptr<Car> carPlayerC2(new Car(Engine(2200, 180), produceTires(0)));
+    std::shared_ptr<Car> carPlayerD2(new Car(Engine(1300, 135), produceTires(1)));
+    
+    playerA->addCar(carPlayerA1);
+    playerA->addCar(carPlayerA2);
+    playerB->addCar(carPlayerB1);
+    playerB->addCar(carPlayerB2);
+    playerC->addCar(carPlayerC1);
+    playerC->addCar(carPlayerC2);
+    playerD->addCar(carPlayerD1);
+    playerD->addCar(carPlayerD2);
+
+    Race race("f1", 100000);
+
+    std::vector<std::pair<std::shared_ptr<Player>, int>> participants;
+    participants.push_back({playerA, 1});
+    participants.push_back({playerB, 0});
+    participants.push_back({playerC, 0});
+    participants.push_back({playerD, 1});
+
+    race.startRace(participants);
+    std::cout << "Winner from " << race.getName() << ": " 
+    << race.getLastWinner()->getName() << std::endl
+    << "Current winner money balance: " << race.getLastWinner()->getBankBalance() << std::endl;
+
+    Garage garage;
+
+    garage.changeTires("expensive", *playerC, 0);
+    garage.updateEngine(6300, 500, *playerC, 0);
+
+    race.startRace(participants);
+    std::cout << "Winner from " << race.getName() << ": " 
+    << race.getLastWinner()->getName() << std::endl
+    << "Current winner money balance: " << race.getLastWinner()->getBankBalance() << std::endl;
+
+    race.updateAward(-10000);
+
+    race.startRace(participants);
+    std::cout << "Winner from " << race.getName() << ": " 
+    << race.getLastWinner()->getName() << std::endl
+    << "Current winner money balance: " << race.getLastWinner()->getBankBalance() << std::endl;
+
+    return 0;
+}
+
+---------------------------------------/oop_garage/relations.puml
+
+@startuml
+Car o--> "4" Tire
+Car *--> "1" Engine
+Garage --> Player
+Player o--> "*" Car
+Race o--> "*" Player
+@enduml
+
+
+---------------------------------------/oop_garage/run.sh
+
+cd build
+./prj

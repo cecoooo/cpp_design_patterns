@@ -1,0 +1,1510 @@
+-------------------------------------------/paint_project/design/design.puml
+
+@startuml
+
+top to bottom direction
+
+abstract class Shape {
+    + {abstract} rotate(angle, pivot)
+    + {abstract} scale(factor, pivot)
+    + {abstract} moveBy(delta)
+    + {abstract} draw()
+}
+
+abstract class Command {
+    + {abstract} execute()
+    + {abstract} undo()
+}
+
+class RotateCommand {
+    - Shape* shape
+    - float degrees
+    + RotateCommand(Shape*, float)
+    + execute()
+    + undo()
+}
+
+class ScaleCommand {
+    - Shape* shape
+    - float percentage
+    + ScaleCommand(Shape*, float)
+    + execute()
+    + undo()
+}
+
+class MoveCommand {
+    - Shape* shape
+    - Vector2D destination
+    + MoveCommand(Shape*, Vector2D)
+    + execute()
+    + undo()
+}
+
+RotateCommand -up-|> Command
+ScaleCommand -up-|> Command
+MoveCommand -up-|> Command
+
+RotateCommand *--> Shape
+ScaleCommand *--> Shape
+MoveCommand *--> Shape
+
+class UndoRedoCommander{
+    - Stack<Command*> undoStack
+    - Stack<Command*> redoStack
+    + addCommand(Command*)
+    + undo()
+    + redo()
+}
+
+UndoRedoCommander *-left-> Command
+
+@enduml
+
+-------------------------------------------/paint_project/implementation/commander/CMakeLists.txt
+
+add_library(commander STATIC)
+target_sources(commander PRIVATE 
+    src/move_command.cpp
+    src/rotate_command.cpp
+    src/scale_command.cpp
+    src/undo_redo_commander.cpp
+)
+
+target_include_directories(commander PUBLIC include)
+target_link_libraries(commander PUBLIC utils elements)
+
+-------------------------------------------/paint_project/implementation/commander/include/command.hpp
+
+#pragma once
+#include <cstdint>
+
+class Command
+{
+protected:
+    uint16_t counterExecution=0;
+public:
+    virtual ~Command()=default;
+    virtual void execute()=0;
+    virtual void undo()=0;
+};
+
+-------------------------------------------/paint_project/implementation/commander/include/move_command.hpp
+
+#pragma once
+#include <memory>
+#include "command.hpp"
+#include "shape.hpp"
+#include "vector_2d.hpp"
+
+class MoveCommand: public Command
+{
+private:
+    std::shared_ptr<Shape> shape;
+    Vector2D destination;
+    Vector2D initial_location;
+public:
+    MoveCommand(std::shared_ptr<Shape> sh, const Vector2D& dest);
+    void execute() override;
+    void undo() override;
+};
+
+-------------------------------------------/paint_project/implementation/commander/include/rotate_command.hpp
+
+#pragma once
+#include <memory>
+#include "command.hpp"
+#include "shape.hpp"
+
+class RotateCommand: public Command
+{
+private:
+    std::shared_ptr<Shape> shape;
+    float degrees;
+public:
+    RotateCommand(std::shared_ptr<Shape> sh, float deg);
+    void execute() override;
+    void undo() override;
+};
+
+-------------------------------------------/paint_project/implementation/commander/include/scale_command.hpp
+
+#pragma once
+#include <memory>
+#include "command.hpp"
+#include "shape.hpp"
+
+class ScaleCommand: public Command
+{
+private:
+    std::shared_ptr<Shape> shape;
+    float percentage;
+public:
+    ScaleCommand(std::shared_ptr<Shape> sh, float per);
+    void execute() override;
+    void undo() override;
+};
+
+-------------------------------------------/paint_project/implementation/commander/include/undo_redo_commander.hpp
+
+#pragma once
+#include <memory>
+#include <stack>
+#include "command.hpp"
+
+class UndoRedoCommander
+{
+private:
+    std::stack<std::unique_ptr<Command>> undoStack;
+    std::stack<std::unique_ptr<Command>> redoStack;
+public:
+    void addCommand(std::unique_ptr<Command>);
+    void undo();
+    void redo();
+};
+
+-------------------------------------------/paint_project/implementation/commander/src/move_command.cpp
+
+#include "move_command.hpp"
+
+MoveCommand::MoveCommand(std::shared_ptr<Shape> sh, const Vector2D& dest)
+: shape(sh), destination(dest), initial_location(sh->coordinates()){}
+
+void MoveCommand::execute()
+{
+    shape->move(destination);
+    counterExecution++;
+}
+
+void MoveCommand::undo()
+{
+    if(counterExecution > 0)
+    {
+        shape->move(initial_location);
+        counterExecution--;
+    }
+}
+
+-------------------------------------------/paint_project/implementation/commander/src/rotate_command.cpp
+
+#include "rotate_command.hpp"
+
+RotateCommand::RotateCommand(std::shared_ptr<Shape> sh, float deg)
+: shape(sh), degrees(deg){}
+
+void RotateCommand::execute()
+{
+    shape->rotate(degrees);
+    counterExecution++;
+}
+
+void RotateCommand::undo()
+{
+    if(counterExecution > 0)
+    {
+        shape->rotate(-degrees);
+        counterExecution--;
+    }
+}
+
+-------------------------------------------/paint_project/implementation/commander/src/scale_command.cpp
+
+#include "scale_command.hpp"
+
+ScaleCommand::ScaleCommand(std::shared_ptr<Shape> sh, float per)
+: shape(sh), percentage(per){}
+
+void ScaleCommand::execute()
+{
+    shape->scale(percentage);
+    counterExecution++;
+}
+
+void ScaleCommand::undo()
+{
+    if(counterExecution > 0)
+    {
+        shape->scale(-percentage);
+        counterExecution--;
+    }
+}
+
+-------------------------------------------/paint_project/implementation/commander/src/undo_redo_commander.cpp
+
+#include "undo_redo_commander.hpp"
+
+void UndoRedoCommander::addCommand(std::unique_ptr<Command> comm)
+{
+    comm->execute();
+
+    while (!redoStack.empty())
+        redoStack.pop();
+        
+    undoStack.push(std::move(comm));
+}
+
+void UndoRedoCommander::undo()
+{
+    if(!undoStack.empty())
+    {
+        undoStack.top()->undo();
+        redoStack.push(std::move(undoStack.top()));
+        undoStack.pop();
+    }
+}
+
+void UndoRedoCommander::redo()
+{
+    if(!redoStack.empty())
+    {
+        redoStack.top()->execute();
+        undoStack.push(std::move(redoStack.top()));
+        redoStack.pop();
+    }
+}
+
+-------------------------------------------/paint_project/implementation/decorators/CMakeLists.txt
+
+add_library(decorators STATIC)
+target_sources(decorators PRIVATE 
+    src/shape_decorator.cpp
+    src/smooth_move_decorator.cpp
+)
+
+target_include_directories(decorators PUBLIC include)
+target_link_libraries(decorators PUBLIC utils elements)
+
+
+-------------------------------------------/paint_project/implementation/decorators/include/shape_decorator.hpp
+
+#pragma once
+#include <memory>
+#include "shape.hpp"
+
+class ShapeDecorator: public Shape
+{
+protected:
+    std::shared_ptr<Shape> decoratedShape;
+public:
+    ShapeDecorator(std::shared_ptr<Shape> shapePtr);
+    virtual ~ShapeDecorator();
+    void move(Vector2D dest) override;
+    void draw(std::shared_ptr<Window> w) override;
+    void rotate(float degrees) override;
+    void scale(float percentage) override;
+    void accept(std::shared_ptr<ShapeVisitor>) override {};
+};
+
+-------------------------------------------/paint_project/implementation/decorators/include/smooth_move_decorator.hpp
+
+#pragma once
+#include <memory>
+#include "shape_decorator.hpp"
+
+class SmoothMoveDecorator: public ShapeDecorator
+{
+public:
+    SmoothMoveDecorator(std::shared_ptr<Shape> shapePtr);
+    void move(Vector2D dest) override;
+};
+
+-------------------------------------------/paint_project/implementation/decorators/src/shape_decorator.cpp
+
+#include "shape_decorator.hpp"
+
+ShapeDecorator::ShapeDecorator(std::shared_ptr<Shape> shapePtr): decoratedShape(shapePtr){}
+
+ShapeDecorator::~ShapeDecorator(){}
+
+void ShapeDecorator::draw(std::shared_ptr<Window> window)
+{
+    decoratedShape->draw(window);
+}
+
+void ShapeDecorator::rotate(float degrees)
+{
+    decoratedShape->rotate(degrees);
+}
+
+void ShapeDecorator::scale(float percentage)
+{
+    decoratedShape->scale(percentage);
+}
+
+void ShapeDecorator::move(Vector2D dest)
+{
+    decoratedShape->move(dest);
+}
+
+-------------------------------------------/paint_project/implementation/decorators/src/smooth_move_decorator.cpp
+
+#include "smooth_move_decorator.hpp"
+#include <thread>
+#include <chrono>
+
+SmoothMoveDecorator::SmoothMoveDecorator(std::shared_ptr<Shape> shapePtr): ShapeDecorator(shapePtr){}
+
+void SmoothMoveDecorator::move(Vector2D dest)
+{
+    if(dest != decoratedShape->coordinates())
+    {
+        if(dest.x() < decoratedShape->coordinates().x())
+        {
+            decoratedShape->move({decoratedShape->coordinates().x() - 1, decoratedShape->coordinates().y()});
+        }
+        else if (dest.x() > decoratedShape->coordinates().x())
+        {
+            decoratedShape->move({decoratedShape->coordinates().x() + 1, decoratedShape->coordinates().y()});
+        }
+        if(dest.y() < decoratedShape->coordinates().y())
+        {
+            decoratedShape->move({decoratedShape->coordinates().x(), decoratedShape->coordinates().y() - 1});
+        }
+        else if (dest.y() > decoratedShape->coordinates().y())
+        {
+            decoratedShape->move({decoratedShape->coordinates().x(), decoratedShape->coordinates().y() + 1});
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
+-------------------------------------------/paint_project/implementation/elements/CMakeLists.txt
+
+add_library(elements STATIC)
+target_sources(elements PRIVATE 
+    src/canvas.cpp
+    src/circle.cpp
+    src/rectangle.cpp
+    src/shape.cpp
+)
+
+target_include_directories(elements PUBLIC include)
+target_link_libraries(elements PUBLIC utils sfml_adapter visitor)
+
+
+-------------------------------------------/paint_project/implementation/elements/include/cancas.hpp
+
+#pragma once
+#include <vector>
+#include <memory>
+#include "shape.hpp"
+#include "shape_type.hpp"
+
+class Canvas: public Shape
+{
+private:
+    std::vector<std::shared_ptr<Shape>> shapes;
+    void fixCoords();
+public:
+    Canvas();
+    void addShape(const std::shared_ptr<Shape> shape);
+    void removeShape(const std::shared_ptr<Shape> shape);
+    void move(Vector2D dest) override;
+    void draw(std::shared_ptr<Window> w) override;
+    void rotate(float degrees) override;
+    void scale(float percentage) override;
+    void accept(std::shared_ptr<ShapeVisitor>) override {};
+};
+
+-------------------------------------------/paint_project/implementation/elements/include/circle.hpp
+
+#pragma once
+#include "shape.hpp"
+#include "shape_type.hpp"
+
+class Circle: public Shape
+{
+private:
+    ShapeType shape;
+    float radius;
+public:
+    Circle(Vector2D coordinates, Color col, float r);
+    void move(Vector2D dest) override;
+    void draw(std::shared_ptr<Window> w) override;
+    void rotate(float degrees) override;
+    void scale(float percentage) override;
+    void accept(std::shared_ptr<ShapeVisitor>) override;
+};
+
+-------------------------------------------/paint_project/implementation/elements/include/rectangle.hpp
+
+#pragma once
+#include "shape.hpp"
+#include "shape_type.hpp"
+
+class Rectangle: public Shape
+{
+private:
+    ShapeType shape;
+    float length;
+    float width;
+public:
+    Rectangle(Vector2D coordinates, Color col, float len, float width);
+    void move(Vector2D dest) override;
+    void draw(std::shared_ptr<Window> w) override;
+    void rotate(float degrees) override;
+    void scale(float percentage) override;
+    void accept(std::shared_ptr<ShapeVisitor>) override;
+};
+
+-------------------------------------------/paint_project/implementation/elements/include/shape.hpp
+
+#pragma once
+#include <string>
+#include <memory>
+#include "color.hpp"
+#include "window.hpp"
+#include "vector_2d.hpp"
+
+class ShapeVisitor;
+
+class Shape
+{
+protected:
+    Vector2D coords;
+public:
+    float rotation=0;
+    Color color;
+    Shape(Vector2D coordinates, Color col);
+    Shape();
+    virtual ~Shape();
+    virtual void move(Vector2D dest)=0;
+    virtual void draw(std::shared_ptr<Window> w)=0;
+    virtual void rotate(float degrees)=0;
+    virtual void scale(float percentage)=0;
+    Vector2D coordinates() const;
+    virtual void accept(std::shared_ptr<ShapeVisitor>)=0;
+};
+
+-------------------------------------------/paint_project/implementation/elements/src/cancas.cpp
+
+#include "canvas.hpp"
+#include <algorithm>
+
+Canvas::Canvas(){}
+
+void Canvas::addShape(const std::shared_ptr<Shape> shape)
+{
+    shapes.push_back(shape);
+    fixCoords();
+}
+
+void Canvas::removeShape(const std::shared_ptr<Shape> shape)
+{
+    shapes.erase(
+        std::remove_if(shapes.begin(), shapes.end(),
+            [&shape](const std::shared_ptr<Shape>& shp) { return shp == shape; }
+        ),
+        shapes.end()
+    );
+    fixCoords();
+}
+
+void Canvas::fixCoords()
+{
+    float newX = 0;
+    float newY = 0;
+    float div = 0;
+    for (auto& ptr : shapes) {
+        newX += ptr->coordinates().x();
+        newY += ptr->coordinates().y();
+        div++;
+    }         
+    if(div > 0)
+    {
+        coords = {newX/div, newY/div};
+    }
+    else
+    {
+        coords = {0, 0};
+    }
+}
+
+void Canvas::draw(std::shared_ptr<Window> window)
+{
+    for (auto& ptr : shapes) {
+        ptr->draw(window);
+    }
+}
+
+void Canvas::rotate(float degrees)
+{
+    for (auto& ptr : shapes) {
+        ptr->rotate(degrees);
+    }
+}
+
+void Canvas::scale(float percentage)
+{
+    for (auto& ptr : shapes) {
+        ptr->scale(percentage);
+    }
+}
+
+void Canvas::move(Vector2D dest)
+{
+    for (auto& ptr : shapes) {
+        ptr->move(dest);
+    }
+    fixCoords();
+}
+
+-------------------------------------------/paint_project/implementation/elements/src/circle.cpp
+
+#include "circle.hpp"
+#include <cmath>
+#include "shape_visitor.hpp"
+
+Circle::Circle(Vector2D coordinates, Color col, float r): Shape(coordinates, col), shape(ShapeType::CIRCLE), radius(r){}
+
+void Circle::draw(std::shared_ptr<Window> window)
+{
+    window->draw(coords, {radius}, color, shape, rotation);
+    window->refresh();
+}
+
+void Circle::rotate(float degrees)
+{
+    rotation += degrees;
+}
+
+void Circle::scale(float percentage)
+{
+    float increaseValue = (std::fabs(percentage)/100)*radius;
+    if(percentage >= 0)
+    {
+        radius += increaseValue;
+    }
+    else
+    {
+        if(std::fabs(percentage) > 100)
+        {
+            radius = 0;
+        }
+        else
+        {
+            radius -= increaseValue;
+        }
+    }
+}
+
+void Circle::move(Vector2D dest)
+{
+    coords = dest;
+}
+
+void Circle::accept(std::shared_ptr<ShapeVisitor> visitor)
+{
+    visitor->visit(*this);
+}
+
+-------------------------------------------/paint_project/implementation/elements/src/rectangle.cpp
+
+#include "rectangle.hpp"
+#include <cmath>
+#include "shape_visitor.hpp"
+
+Rectangle::Rectangle(Vector2D coordinates, Color col, float len, float width): 
+    Shape(coordinates, col), shape(ShapeType::RECTANGLE), length(len), width(width){}
+
+void Rectangle::draw(std::shared_ptr<Window> window)
+{
+    window->draw(coords, {length, width}, color, shape, rotation);
+    window->refresh();
+}
+
+void Rectangle::rotate(float degrees)
+{
+    rotation += degrees;
+}
+
+void Rectangle::scale(float percentage)
+{
+    float increaseValueLen = (std::fabs(percentage)/100)*length;
+    float increaseValueWid = (std::fabs(percentage)/100)*width;
+    if(percentage >= 0)
+    {
+        length += increaseValueLen;
+        width += increaseValueWid;
+    }
+    else
+    {
+        if(std::fabs(percentage) > 100)
+        {
+            length = 0;
+            width = 0;
+        }
+        else
+        {
+            length -= increaseValueLen;
+            width -= increaseValueWid;
+        }
+    }
+}
+
+void Rectangle::move(Vector2D dest)
+{
+    coords = dest;
+}
+
+void Rectangle::accept(std::shared_ptr<ShapeVisitor> visitor)
+{
+    visitor->visit(*this);
+}
+
+-------------------------------------------/paint_project/implementation/elements/src/shape.cpp
+
+#include "shape.hpp"
+
+Shape::Shape(Vector2D coordinates, Color col): coords(coordinates), color(col)
+{}
+
+Shape::Shape(): coords(0, 0), color(WHITE){}
+
+Shape::~Shape(){}
+
+Vector2D Shape::coordinates() const
+{
+    return coords;
+}
+
+
+-------------------------------------------/paint_project/implementation/sfml_adapter/CMakeLists.txt
+
+add_library(sfml_adapter STATIC)
+
+set(SFML_STATIC_LIBRARIES ON)
+find_package(SFML 3 REQUIRED COMPONENTS Graphics Window System)
+
+target_sources(sfml_adapter PRIVATE
+    src/window.cpp
+    src/sfml_window_adapter.cpp
+)
+
+target_include_directories(sfml_adapter PUBLIC include)
+target_link_libraries(sfml_adapter PUBLIC 
+    utils
+    SFML::Graphics
+    SFML::Window
+    SFML::System)
+
+-------------------------------------------/paint_project/implementation/sfml_adapter/include/sfml_window_adapter.hpp
+
+#pragma once
+#include <SFML/Graphics.hpp>
+#include <memory>
+#include "window.hpp"
+
+class SfmlWindowAdapter: public Window
+{
+private:
+    sf::RenderWindow window;
+    sf::Color determineColor(Color col);
+    std::unique_ptr<sf::Shape> determineShape(ShapeType sht, const std::vector<float>& sizes);
+    std::optional<Vector2D> checkForButtonPressed(sf::Mouse::Button typeOfButton);
+public:
+    SfmlWindowAdapter(unsigned int len, unsigned int wid, std::string name);
+    void startWindow() override;
+    void stopWindow() override;
+    bool isOpen() override;
+    bool checkForCloseEvent() override;
+    void clear() override;
+    void draw(Vector2D position, const std::vector<float>& sizes, Color col, ShapeType sht, float rotation) override;
+    void refresh() override;
+    std::optional<Vector2D> catchLeftButtonClick() override;
+    std::optional<Vector2D> catchRightButtonClick() override;
+    std::optional<Vector2D> catchMiddleButtonClick() override;
+    Vector2D getMousePosition() override;
+};
+
+-------------------------------------------/paint_project/implementation/sfml_adapter/include/window.hpp
+
+#pragma once
+#include <vector>
+#include <string>
+#include <optional>
+#include "vector_2d.hpp"
+#include "color.hpp"
+#include "shape_type.hpp"
+
+class Window
+{
+protected:
+    unsigned int length;
+    unsigned int width;
+    std::string windowName;
+public:
+    Window(unsigned int len, unsigned int wid, std::string name);
+    virtual ~Window()=0;
+    virtual void startWindow()=0;
+    virtual void stopWindow()=0;
+    virtual bool isOpen()=0;
+    virtual bool checkForCloseEvent()=0;
+    virtual void clear()=0;
+    virtual void draw(Vector2D position, const std::vector<float>& sizes, Color col, ShapeType sht, float rotation)=0;
+    virtual void refresh()=0;
+    virtual std::optional<Vector2D> catchLeftButtonClick()=0;
+    virtual std::optional<Vector2D> catchRightButtonClick()=0;
+    virtual std::optional<Vector2D> catchMiddleButtonClick()=0;
+    virtual Vector2D getMousePosition()=0;
+};
+
+-------------------------------------------/paint_project/implementation/sfml_adapter/src/sfml_window_adapter.cpp
+
+#include "sfml_window_adapter.hpp"
+#include <stdexcept>
+#include <iostream>
+
+SfmlWindowAdapter::SfmlWindowAdapter(unsigned int len, unsigned int wid, std::string name): Window(len, wid, name)
+{}
+
+void SfmlWindowAdapter::startWindow()
+{
+    window.create(sf::VideoMode({length, width}), windowName); 
+}
+
+void SfmlWindowAdapter::stopWindow()
+{
+    window.close();
+}
+
+bool SfmlWindowAdapter::isOpen()
+{
+    return window.isOpen();
+}
+
+bool SfmlWindowAdapter::checkForCloseEvent()
+{
+    bool res = false;
+    while (auto eventOpt = window.pollEvent())
+    {
+        if (eventOpt->is<sf::Event::Closed>())
+        {
+            res = true;
+        }
+    }
+    return res;
+}
+
+void SfmlWindowAdapter::clear()
+{
+    window.clear(sf::Color::White);
+}
+
+void SfmlWindowAdapter::draw(Vector2D position, const std::vector<float>& sizes, Color col, ShapeType sht, float rotation)
+{
+    std::unique_ptr<sf::Shape> shape = determineShape(sht, sizes);
+    shape->setFillColor(determineColor(col));
+    shape->setPosition(position);
+    shape->setRotation(sf::degrees(rotation));
+    window.draw(*shape);
+}
+
+void SfmlWindowAdapter::refresh()
+{
+    window.display();
+}
+
+sf::Color SfmlWindowAdapter::determineColor(Color col)
+{
+    return sf::Color(col.r, col.g, col.b, col.a);
+}
+
+std::unique_ptr<sf::Shape> SfmlWindowAdapter::determineShape(ShapeType sht, const std::vector<float>& sizes)
+{
+    if(sizes.size() == 0)
+    {
+        throw std::runtime_error("Size not given!");
+    }
+    else if(sizes.size() < 2 && (sht == ShapeType::POLYGON || sht == ShapeType::RECTANGLE))
+    {
+        if(sht == ShapeType::POLYGON)
+        {
+            throw std::runtime_error("Polygon number of sizes not given!");
+        }
+        if(sht == ShapeType::RECTANGLE)
+        {
+            throw std::runtime_error("Rectangle sides not given!");
+        }
+    }
+    else if(sizes[1] < 3 && sht == ShapeType::POLYGON)
+    {
+        throw std::runtime_error("Polygon must have at least 3 sides.");
+    }
+    switch(sht)
+    {
+        case CIRCLE:
+            return std::make_unique<sf::CircleShape>(sizes[0]);
+            break;
+        case RECTANGLE:
+            return std::make_unique<sf::RectangleShape>(sf::Vector2f{sizes[0], sizes[1]});
+            break;
+        case TRIANGLE:
+            return std::make_unique<sf::CircleShape>(sizes[0], 3);
+            break;
+        case SQUARE:
+            return std::make_unique<sf::CircleShape>(sizes[0], 4);
+            break;
+    }
+    return std::make_unique<sf::CircleShape>(sizes[0], static_cast<std::size_t>(sizes[1]));
+}
+
+std::optional<Vector2D> SfmlWindowAdapter::checkForButtonPressed(sf::Mouse::Button typeOfButton)
+{
+    while (auto eventOpt = window.pollEvent())
+    {
+        if (eventOpt->is<sf::Event::MouseButtonPressed>())
+        {
+            std::cout << "button pressed" << std::endl;
+            const auto* mouse = eventOpt->getIf<sf::Event::MouseButtonPressed>();
+            if (mouse && mouse->button == typeOfButton)
+            {
+                std::cout << "button is left" << std::endl;
+                return Vector2D(mouse->position.x, mouse->position.y);
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<Vector2D> SfmlWindowAdapter::catchLeftButtonClick()
+{
+    return checkForButtonPressed(sf::Mouse::Button::Left);
+}
+
+std::optional<Vector2D> SfmlWindowAdapter::catchRightButtonClick()
+{
+    return checkForButtonPressed(sf::Mouse::Button::Right);
+}
+
+std::optional<Vector2D> SfmlWindowAdapter::catchMiddleButtonClick()
+{
+    return checkForButtonPressed(sf::Mouse::Button::Middle);
+}
+
+Vector2D SfmlWindowAdapter::getMousePosition()
+{
+    sf::Vector2i mousePosWindow = sf::Mouse::getPosition(window);
+    return Vector2D(mousePosWindow.x, mousePosWindow.y);
+}
+
+-------------------------------------------/paint_project/implementation/sfml_adapter/src/window.cpp
+
+#include "window.hpp"
+
+Window::Window(unsigned int len, unsigned int wid, std::string name): length(len), width(wid), windowName(name) {}
+
+Window::~Window() {}
+
+
+-------------------------------------------/paint_project/implementation/state/CMakeLists.txt
+
+add_library(state STATIC)
+target_sources(state PRIVATE 
+    src/context.cpp
+    src/rotate_state.cpp
+    src/move_state.cpp
+    src/click_state.cpp
+)
+
+target_include_directories(state PUBLIC include)
+target_link_libraries(state PUBLIC utils elements)
+
+-------------------------------------------/paint_project/implementation/state/design.puml
+
+abstract class BaseState
+{
+    + abstract execute(Shape shape);
+}
+
+Class RotateState
+{
+    + execute(Shape shape);
+}
+
+Class MoveState
+{
+    + execute(Shape shape);
+}
+
+class Context
+{
+    - State state;
+    + createState(State state);
+    + execute();
+}
+
+abstract class Shape
+
+RotateState --|> BaseState
+MoveState --|> BaseState
+Context o--> BaseState
+BaseState -down-> Shape
+
+-------------------------------------------/paint_project/implementation/state/include/base_state.hpp
+
+#pragma once
+#include "shape.hpp"
+#include "window.hpp"
+
+class BaseState
+{
+public:
+    virtual ~BaseState()=default;
+    virtual void executeAction(std::shared_ptr<Shape> shape, std::shared_ptr<Window> window)=0;
+};
+
+
+// case: click on a shape -> move the shape with cursor -> click again and shape stop moving with cursor
+
+-------------------------------------------/paint_project/implementation/state/include/click_state.hpp
+
+#pragma once
+#include "base_state.hpp"
+
+class ClickState: BaseState
+{
+public:
+    void executeAction(std::shared_ptr<Shape> shape, std::shared_ptr<Window> window) override;
+};
+
+-------------------------------------------/paint_project/implementation/state/include/conext.hpp
+
+#pragma once
+#include "base_state.hpp"
+#include "shape.hpp"
+#include <memory>
+
+class Context
+{
+private:
+    std::unique_ptr<BaseState> state;
+public:
+    void createState(std::unique_ptr<BaseState>);
+    void execute(std::shared_ptr<Shape> shape, std::shared_ptr<Window> window);
+};
+
+-------------------------------------------/paint_project/implementation/state/include/move_state.hpp
+
+#pragma once
+#include "base_state.hpp"
+
+class MoveState: BaseState
+{
+public:
+    void executeAction(std::shared_ptr<Shape> shape, std::shared_ptr<Window> window) override;
+};
+
+-------------------------------------------/paint_project/implementation/state/include/rotate_state.hpp
+
+#pragma once
+#include "base_state.hpp"
+
+class RotateState: BaseState
+{
+public:
+    void executeAction(std::shared_ptr<Shape> shape, std::shared_ptr<Window> window) override;
+};
+
+-------------------------------------------/paint_project/implementation/state/src/click_state.cpp
+
+#include "click_state.hpp"
+
+void ClickState::executeAction(std::shared_ptr<Shape> shape, std::shared_ptr<Window> window)
+{
+    while(!window->catchLeftButtonClick())
+    {
+        shape->move(window->getMousePosition());
+    }
+}
+
+-------------------------------------------/paint_project/implementation/state/src/conext.cpp
+
+#include "context.hpp"
+
+void Context::createState(std::unique_ptr<BaseState> state)
+{
+    this->state = std::move(state);
+}
+
+void Context::execute(std::shared_ptr<Shape> shape, std::shared_ptr<Window> window)
+{
+    state->executeAction(shape, window);
+}
+
+-------------------------------------------/paint_project/implementation/state/src/move_state.cpp
+
+#include "move_state.hpp"
+
+void MoveState::executeAction(std::shared_ptr<Shape> shape, std::shared_ptr<Window> window)
+{
+    
+}
+
+-------------------------------------------/paint_project/implementation/state/src/rotate_state.cpp
+
+#include "rotate_state.hpp"
+
+void RotateState::executeAction(std::shared_ptr<Shape> shape, std::shared_ptr<Window> window)
+{
+    
+}
+
+-------------------------------------------/paint_project/implementation/utils/CMakeLists.txt
+
+add_library(utils STATIC)
+target_sources(utils PRIVATE src/vector_2d.cpp)
+target_include_directories(utils PUBLIC include)
+
+-------------------------------------------/paint_project/implementation/utils/include/color.hpp
+
+#pragma once
+#include <cstdint>
+
+struct Color
+{
+    std::uint8_t r;
+    std::uint8_t g;
+    std::uint8_t b;
+    std::uint8_t a;
+
+    constexpr bool operator==(const Color& other) const
+    {
+        return r == other.r && g == other.g && b == other.b && a == other.a;
+    }
+};
+
+inline constexpr Color BLACK       { 0,   0,   0,   255 };
+inline constexpr Color WHITE       { 255, 255, 255, 255 };
+inline constexpr Color RED         { 255, 0,   0,   255 };
+inline constexpr Color GREEN       { 0,   255, 0,   255 };
+inline constexpr Color BLUE        { 0,   0,   255, 255 };
+inline constexpr Color YELLOW      { 255, 255, 0,   255 };
+inline constexpr Color MAGENTA     { 255, 0,   255, 255 };
+inline constexpr Color CYAN        { 0,   255, 255, 255 };
+inline constexpr Color TRANSPARENT  { 0,   0,   0,   0   };
+
+-------------------------------------------/paint_project/implementation/utils/include/shape_type.hpp
+
+#pragma once
+
+enum ShapeType
+{
+    CIRCLE,
+    RECTANGLE,
+    TRIANGLE,
+    SQUARE, 
+    POLYGON
+};
+
+-------------------------------------------/paint_project/implementation/utils/include/vector_2d.hpp
+
+#pragma once
+#include <SFML/System/Vector2.hpp>
+#include <cmath>
+
+class Vector2D
+{
+private:
+    float  X;
+    float  Y;
+public:
+    Vector2D() = default;
+    Vector2D(float  x, float  y);
+    Vector2D(const Vector2D& other);
+    Vector2D(Vector2D&& other) noexcept;
+
+    float  x() const;
+    float  y() const;
+    float distance(const Vector2D& other) const;
+
+    Vector2D operator+(const Vector2D& other) const;
+    Vector2D operator-(const Vector2D& other) const;
+    Vector2D operator*(float  scalar) const;
+    Vector2D operator/(float  scalar) const;
+    Vector2D& operator+=(const Vector2D& other);
+    Vector2D& operator-=(const Vector2D& other);
+    Vector2D& operator*=(float  scalar);
+    Vector2D& operator/=(float  scalar);
+
+    Vector2D& operator=(const Vector2D& other); 
+    Vector2D& operator=(Vector2D&& other) noexcept;
+
+    bool operator==(const Vector2D& other) const;
+    bool operator!=(const Vector2D& other) const;
+    bool operator<(const Vector2D& other) const;
+    bool operator>(const Vector2D& other) const;
+    bool operator<=(const Vector2D& other) const;
+    bool operator>=(const Vector2D& other) const;
+
+    operator sf::Vector2f() const;
+};
+
+-------------------------------------------/paint_project/implementation/utils/src/vector_2d.cpp
+
+#include "vector_2d.hpp"
+#include "math.h"
+
+
+Vector2D::Vector2D(float  x, float  y): X(x), Y(y){}
+
+Vector2D::Vector2D(const Vector2D& other) : X(other.X), Y(other.Y) {}
+
+Vector2D::Vector2D(Vector2D&& other) noexcept : X(other.X), Y(other.Y) {}
+
+float  Vector2D::x() const
+{
+    return X;
+}
+
+float  Vector2D::y() const
+{
+    return Y;
+}
+
+float Vector2D::distance(const Vector2D& other) const
+{
+    float dx = static_cast<float>(X - other.X);
+    float dy = static_cast<float>(Y - other.Y);
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+Vector2D Vector2D::operator+(const Vector2D& other) const {
+    return Vector2D(X + other.X, Y + other.Y);
+}
+
+Vector2D Vector2D::operator-(const Vector2D& other) const {
+    return Vector2D(X - other.X, Y - other.Y);
+}
+
+Vector2D Vector2D::operator*(float  scalar) const {
+    return Vector2D(X * scalar, Y * scalar);
+}
+
+Vector2D Vector2D::operator/(float  scalar) const {
+    if (scalar == 0) return *this;
+    return Vector2D(X / scalar, Y / scalar);
+}
+
+Vector2D& Vector2D::operator+=(const Vector2D& other) {
+    X += other.X;
+    Y += other.Y;
+    return *this;
+}
+
+Vector2D& Vector2D::operator-=(const Vector2D& other) {
+    X -= other.X;
+    Y -= other.Y;
+    return *this;
+}
+
+Vector2D& Vector2D::operator*=(float  scalar) {
+    X *= scalar;
+    Y *= scalar;
+    return *this;
+}
+
+Vector2D& Vector2D::operator/=(float  scalar) {
+    if (scalar != 0) {
+        X /= scalar;
+        Y /= scalar;
+    }
+    return *this;
+}
+
+Vector2D& Vector2D::operator=(const Vector2D& other) {
+    if (this != &other) {
+        X = other.X;
+        Y = other.Y;
+    }
+    return *this;
+}
+
+
+Vector2D& Vector2D::operator=(Vector2D&& other) noexcept {
+    if (this != &other) {
+        X = other.X;
+        Y = other.Y;
+    }
+    return *this;
+}
+
+bool Vector2D::operator==(const Vector2D& other) const {
+    return X == other.X && Y == other.Y;
+}
+
+bool Vector2D::operator!=(const Vector2D& other) const {
+    return !(*this == other);
+}
+
+bool Vector2D::operator<(const Vector2D& other) const {
+    return distance(Vector2D(0, 0)) < other.distance(Vector2D(0, 0));
+}
+
+bool Vector2D::operator>(const Vector2D& other) const {
+    return distance(Vector2D(0, 0)) > other.distance(Vector2D(0, 0));
+}
+
+bool Vector2D::operator<=(const Vector2D& other) const {
+    return *this < other || *this == other;
+}
+
+bool Vector2D::operator>=(const Vector2D& other) const {
+    return *this > other || *this == other;
+}
+
+Vector2D::operator sf::Vector2f() const
+{
+    return sf::Vector2f(X, Y);
+}
+
+-------------------------------------------/paint_project/implementation/visitor/CMakeLists.txt
+
+add_library(visitor STATIC)
+target_sources(visitor PRIVATE 
+    src/rotate_visitor.cpp
+    src/color_visitor.cpp
+)
+
+target_include_directories(visitor PUBLIC include)
+target_link_libraries(visitor PUBLIC utils elements)
+
+-------------------------------------------/paint_project/implementation/visitor/design.puml
+
+abstract class Shape
+
+abstract class ShapeVisitor
+{
+    abstract visit(Shape shape)
+}
+
+class ColorVisitor
+{
+   visit(Shape shape) 
+}
+
+class RotateVisitor
+{
+    visit(Shape shape)
+}
+
+class Rectangle
+{
+    accept(ShapeVisitor visitor)
+}
+
+ColorVisitor --|> ShapeVisitor
+RotateVisitor --|> ShapeVisitor
+ShapeVisitor -left-> Shape
+Rectangle --|> Shape
+Rectangle --> ShapeVisitor
+
+-------------------------------------------/paint_project/implementation/visitor/include/color_visitor.hpp
+
+#pragma once
+#include "shape_visitor.hpp"
+#include "color.hpp"
+
+class ColorVisitor: public ShapeVisitor
+{
+public:
+    void visit(Circle& shape) override;
+    void visit(Rectangle& shape) override;
+};
+
+-------------------------------------------/paint_project/implementation/visitor/include/rotate_visitor.hpp
+
+#pragma once
+#include "shape_visitor.hpp"
+
+class RotateVisitor: public ShapeVisitor
+{
+public:
+    void visit(Circle& shape) override;
+    void visit(Rectangle& shape) override;
+};
+
+-------------------------------------------/paint_project/implementation/visitor/include/shape_visitor.hpp
+
+#pragma once
+#include "circle.hpp"
+#include "rectangle.hpp"
+
+class ShapeVisitor
+{
+public:
+    ~ShapeVisitor()=default;
+    virtual void visit(Circle& shape) = 0;
+    virtual void visit(Rectangle& shape) = 0;
+};
+
+-------------------------------------------/paint_project/implementation/visitor/src/color_visitor.cpp
+
+#include "color_visitor.hpp"
+#include "color.hpp"
+
+void ColorVisitor::visit(Circle& shape)
+{
+    shape.color = BLACK;
+}
+
+void ColorVisitor::visit(Rectangle& shape)
+{
+    shape.color = BLACK;
+}
+
+-------------------------------------------/paint_project/implementation/visitor/src/rotate_visitor.cpp
+
+#include "rotate_visitor.hpp"
+
+void RotateVisitor::visit(Circle& shape)
+{
+    shape.rotation += 30;
+}
+
+void RotateVisitor::visit(Rectangle& shape)
+{
+    shape.rotation += 30;
+}
+
+-------------------------------------------/paint_project/implementation/build.sh
+
+rm -rf build
+cmake -S . -B build
+cmake --build build
+
+-------------------------------------------/paint_project/implementation/CMakeLists.txt
+
+cmake_minimum_required(VERSION 3.16)
+
+project(paint_project LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_executable(paint_project
+    main.cpp
+)
+
+add_subdirectory(utils)
+add_subdirectory(elements)
+add_subdirectory(decorators)
+add_subdirectory(sfml_adapter)
+add_subdirectory(commander)
+add_subdirectory(visitor)
+add_subdirectory(state)
+
+target_link_libraries(paint_project PRIVATE
+    utils
+    elements
+    decorators
+    sfml_adapter
+    commander
+    visitor
+    state
+)
+
+-------------------------------------------/paint_project/implementation/main.cpp
+
+#include <iostream>
+#include <memory>
+#include <thread>
+#include <chrono>
+#include <cmath>
+#include "vector_2d.hpp"
+#include "circle.hpp"
+#include "rectangle.hpp"
+#include "canvas.hpp"
+#include "smooth_move_decorator.hpp"
+#include "sfml_window_adapter.hpp"
+#include "color.hpp"
+#include "rotate_command.hpp"
+#include "undo_redo_commander.hpp"
+#include "rotate_visitor.hpp"
+#include "color_visitor.hpp"
+#include "context.hpp"
+
+int main()
+{
+    std::shared_ptr<Window> window = std::make_shared<SfmlWindowAdapter>(1920, 1056, "OOPaint");
+
+    std::shared_ptr<Circle> circle = std::make_shared<Circle>(Vector2D(30, 40), RED, 10);
+    std::shared_ptr<Rectangle> rect = std::make_shared<Rectangle>(Vector2D(30, 50), BLUE, 10, 20);
+    Canvas canvas;
+    canvas.addShape(circle);
+    canvas.addShape(rect);
+    SmoothMoveDecorator smoothMoveDecorator(std::make_shared<Canvas>(canvas));
+
+    RotateCommand rotComm(std::make_shared<Canvas>(canvas), 45);
+    UndoRedoCommander undoRedoCommander;
+    undoRedoCommander.addCommand(std::make_unique<RotateCommand>(rotComm));
+
+    std::shared_ptr<ShapeVisitor> scaleVisitor = std::make_shared<ColorVisitor>();
+    std::shared_ptr<ShapeVisitor> rotateVisitor = std::make_shared<RotateVisitor>();
+    Context context;
+
+    Rectangle rectangle(Vector2D(50, 100), CYAN, 20, 30);
+
+    int i = 0;
+
+    window->startWindow();
+    std::thread changeShapeCoords;
+    while (window->isOpen())
+    {
+        if(window->checkForCloseEvent())
+        {
+            window->stopWindow();
+        }
+        std::optional<Vector2D> cursorCoords = window->catchLeftButtonClick();
+        if (cursorCoords.has_value() && !changeShapeCoords.joinable()) 
+        {
+            if((std::abs(cursorCoords.value().x() - rect->coordinates().x()) <= 10) 
+               && (std::abs(cursorCoords.value().y() - rect->coordinates().y()) <= 10))
+            {
+                changeShapeCoords = std::thread(&Context::execute, &context, rect, window);
+            }
+            else if((std::abs(cursorCoords.value().x() - circle->coordinates().x()) <= 10) 
+               && (std::abs(cursorCoords.value().y() - circle->coordinates().y()) <= 10))
+            {
+                changeShapeCoords = std::thread(&Context::execute, &context, circle, window);
+            }
+            else if((std::abs(cursorCoords.value().x() - rectangle.coordinates().x()) <= 10) 
+               && (std::abs(cursorCoords.value().y() - rectangle.coordinates().y()) <= 10))
+            {
+                changeShapeCoords = std::thread(&Context::execute, &context, std::make_shared<Rectangle>(rectangle), window);
+                std::cout << "inside if rectangle" << std::endl;
+            }
+            std::cout << "inside if left click" << std::endl;
+        }
+
+        window->clear();
+        canvas.draw(window);
+        rectangle.draw(window);
+        //std::this_thread::sleep_for(std::chrono::seconds(1));
+        //std::this_thread::sleep_for(std::chrono::seconds(5));
+        //canvas.scale(100);
+        // smoothMoveDecorator.move({300, 200});
+        // rectangle.accept(scaleVisitor);
+        // rectangle.accept(rotateVisitor);
+        // //smoothMoveDecorator.rotate(30);
+        // if(i > 50)
+        // {
+        //     undoRedoCommander.undo();
+        //     i=0;
+        // }
+        // else 
+        // {
+        //     undoRedoCommander.redo();
+        // }
+        // i++;
+    }
+    if (changeShapeCoords.joinable()) {
+        changeShapeCoords.join();
+    }
+    return 0;
+}
+
+-------------------------------------------/paint_project/implementation/run.sh
+
+cd build
+./paint_project

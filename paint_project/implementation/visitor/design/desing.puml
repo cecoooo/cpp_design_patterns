@@ -1,0 +1,27 @@
+abstract class Shape
+
+abstract class ShapeVisitor
+{
+    abstract visit(Shape shape)
+}
+
+class ColorVisitor
+{
+   visit(Shape shape) 
+}
+
+class RotateVisitor
+{
+    visit(Shape shape)
+}
+
+class Rectangle
+{
+    accept(ShapeVisitor visitor)
+}
+
+ColorVisitor --|> ShapeVisitor
+RotateVisitor --|> ShapeVisitor
+ShapeVisitor -left-> Shape
+Rectangle --|> Shape
+Rectangle --> ShapeVisitor

@@ -1,0 +1,96 @@
+@startuml
+
+class Window
+{
+    - window: RenderWindow
+    - createShape(int size, ShapeType shapeType): CircleShape
+    - fillColor(CircleShape& shape, Color color): void
+
+    + isOpen(): bool
+    + close(): void
+    + display(): void
+    + clear(): void
+    + draw(int size, ShapeType shapeType, Color color, Vector2D coords): void
+    + checkForCloseCommand(): bool
+}
+
+
+class Resource
+{
+    # size: int
+    # color: Color
+    # shape: ShapeType
+    # coords: Vector2D
+
+    + getSize(): int
+    + getColor(): Color
+    + getShape(): ShapeType
+    + getCoords(): Vector2D
+}
+
+class Stone 
+class Wood 
+class Coal 
+class Iron 
+
+
+
+class World 
+{
+    - players: std::vector<std::shared_ptr<Player>>
+    - window: std::shared_ptr<Window>
+
+    + displayAllResources(std::vector<std::shared_ptr<Resource>>): void
+    + addPlayer(std::shared_ptr<Player>): void
+    + removePlayer(std::shared_ptr<Player>): void
+    + displayAllPlayers(): void
+}
+
+
+class Player
+{
+    - resources: std::vector<std::shared_ptr<Resource>>
+    - color: Color
+    - shape: ShapeType
+    - coords: Vector2D
+    - makeStep(Vector2D destination): void
+    
+    + getColor(): Color
+    + getShape(): ShapeType
+    + getCoords(): Vector2D
+    + gatherResources(int speed, ResourceMap& map, const std::shared_ptr<Strategy>& strategy): void
+}
+
+class ResourceMap
+{
+    - resources: std::vector<std::shared_ptr<Resource>>
+    + getResources(): std::vector<std::shared_ptr<Resource>>
+    + addResource(std::shared_ptr<Resource>): void
+    + removeResource(std::shared_ptr<Resource>): void
+}
+
+abstract class Strategy
+{
+    + collect(const std::vector<std::shared_ptr<Resource>>& resources, 
+        const Vector2D& coords): std::shared_ptr<Resource>
+}
+
+class ClosestPointStrategy
+class GreedyStrategy
+
+World *-up-> Window
+World o-down-> Player
+Coal -up-|> Resource
+Iron -up-|> Resource
+Stone -up-|> Resource
+Wood -up-|> Resource
+Player o-left-> Resource
+Player -down-> ResourceMap
+World --> Resource
+ResourceMap o-down-> Resource
+Player -right-> Strategy
+ClosestPointStrategy -down-|> Strategy
+GreedyStrategy -down-|> Strategy
+Strategy --> Resource
+
+@enduml

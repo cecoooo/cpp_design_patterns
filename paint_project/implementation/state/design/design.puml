@@ -1,0 +1,28 @@
+abstract class BaseState
+{
+    + abstract execute(Shape shape);
+}
+
+Class RotateState
+{
+    + execute(Shape shape);
+}
+
+Class MoveState
+{
+    + execute(Shape shape);
+}
+
+class Context
+{
+    - State state;
+    + createState(State state);
+    + execute();
+}
+
+abstract class Shape
+
+RotateState --|> BaseState
+MoveState --|> BaseState
+Context o--> BaseState
+BaseState -down-> Shape

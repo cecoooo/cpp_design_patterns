@@ -1,0 +1,59 @@
+@startuml
+
+top to bottom direction
+
+abstract class Shape {
+    + {abstract} rotate(angle, pivot)
+    + {abstract} scale(factor, pivot)
+    + {abstract} moveBy(delta)
+    + {abstract} draw()
+}
+
+abstract class Command {
+    + {abstract} execute()
+    + {abstract} undo()
+}
+
+class RotateCommand {
+    - Shape* shape
+    - float degrees
+    + RotateCommand(Shape*, float)
+    + execute()
+    + undo()
+}
+
+class ScaleCommand {
+    - Shape* shape
+    - float percentage
+    + ScaleCommand(Shape*, float)
+    + execute()
+    + undo()
+}
+
+class MoveCommand {
+    - Shape* shape
+    - Vector2D destination
+    + MoveCommand(Shape*, Vector2D)
+    + execute()
+    + undo()
+}
+
+RotateCommand -up-|> Command
+ScaleCommand -up-|> Command
+MoveCommand -up-|> Command
+
+RotateCommand *--> Shape
+ScaleCommand *--> Shape
+MoveCommand *--> Shape
+
+class UndoRedoCommander{
+    - Stack<Command*> undoStack
+    - Stack<Command*> redoStack
+    + addCommand(Command*)
+    + undo()
+    + redo()
+}
+
+UndoRedoCommander *-left-> Command
+
+@enduml
